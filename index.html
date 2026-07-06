@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>자동 토의 프로그램</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --bg:#DCEBFB;
+    --panel:#F6FAFF;
+    --panel-2:#BFDCF5;
+    --navy-deep:#153A63;
+    --paper:#F5EFE1;
+    --ink:#3A2E22;
+    --ink-soft:#8B7D68;
+    --brass:#2E6FDB;
+    --brass-soft:#6FA0E8;
+    --line:rgba(21,58,99,0.16);
+    --text:#16233A;
+    --text-dim:#5B6B85;
+    --danger:#C24E3C;
+    --radius:14px;
+    --font-display:'Noto Serif KR',serif;
+    --font-body:'Pretendard',-apple-system,sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+  }
+  .app{
+    max-width:960px;
+    margin:0 auto;
+    padding:28px 20px 80px;
+  }
+  .doc-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:2px solid var(--navy-deep);
+    padding-bottom:14px;
+    margin-bottom:22px;
+  }
+  .doc-header h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:22px;
+    margin:0 0 4px;
+    letter-spacing:-0.2px;
+  }
+  .doc-header .sub{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+  }
+  .doc-meta{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+    text-align:right;
+  }
+  .steps-nav{
+    display:flex;
+    gap:6px;
+    margin-bottom:26px;
+    font-family:var(--font-mono);
+    font-size:11px;
+  }
+  .steps-nav span{
+    flex:1;
+    text-align:center;
+    padding:8px 4px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--text-dim);
+    background:var(--panel);
+  }
+  .steps-nav span.active{
+    color:#FFFFFF;
+    background:var(--brass);
+    border-color:var(--brass);
+    font-weight:600;
+  }
+  .steps-nav span.done{
+    color:var(--brass-soft);
+    border-color:var(--brass-soft);
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:24px;
+    margin-bottom:18px;
+    box-shadow:0 2px 8px rgba(21,58,99,0.12);
+  }
+  .card h2{
+    font-family:var(--font-display);
+    font-size:17px;
+    margin:0 0 6px;
+  }
+  .card .hint{
+    font-size:13px;
+    color:var(--text-dim);
+    margin:0 0 18px;
+    line-height:1.6;
+  }
+  label.field-label{
+    display:block;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+    font-family:var(--font-mono);
+  }
+  textarea, input[type=text], input[type=url]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    color:var(--text);
+    font-family:var(--font-body);
+    font-size:14px;
+    padding:12px 14px;
+    resize:vertical;
+    outline:none;
+  }
+  textarea:focus, input:focus{border-color:var(--brass);}
+  textarea{min-height:110px;}
+  .field-row{margin-bottom:16px;}
+  .file-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .file-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--panel-2);
+    border:1px dashed var(--line);
+    border-radius:10px;
+    padding:10px 14px;
+    font-size:13px;
+    color:var(--text-dim);
+    cursor:pointer;
+  }
+  .file-btn:hover{border-color:var(--brass);}
+  #imgPreviewWrap{display:none; align-items:center; gap:10px;}
+  #imgPreview{height:44px; border-radius:6px; border:1px solid var(--line);}
+  .img-remove{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--danger);
+    cursor:pointer;
+    background:none;
+    border:none;
+  }
+  .btn-row{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:8px;
+  }
+  button.primary{
+    background:var(--brass);
+    color:#FFFFFF;
+    border:none;
+    font-weight:600;
+    padding:11px 22px;
+    border-radius:10px;
+    font-size:14px;
+    cursor:pointer;
+    font-family:var(--font-body);
+  }
+  button.primary:disabled{
+    background:#CBD5E1;
+    color:#94A3B8;
+    cursor:not-allowed;
+  }
+  button.ghost{
+    background:transparent;
+    color:var(--text-dim);
+    border:1px solid var(--line);
+    padding:11px 18px;
+    border-radius:10px;
+    font-size:14px;
+    cursor:pointer;
+    font-family:var(--font-body);
+  }
+  button.ghost:hover{border-color:var(--brass-soft); color:var(--text);}
+
+  /* seat table */
+  .table-wrap{display:flex; justify-content:center; margin-bottom:8px;}
+  #seatSvg{width:260px; height:260px;}
+  .seat-count{
+    text-align:center;
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:20px;
+  }
+  .seat-count b{color:var(--brass-soft);}
+  .roles-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-bottom:20px;
+  }
+  @media(max-width:640px){.roles-grid{grid-template-columns:repeat(2,1fr);}}
+  .role-card{
+    position:relative;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:12px 12px 12px 14px;
+    cursor:pointer;
+    background:var(--panel-2);
+    transition:border-color .15s, background .15s;
+  }
+  .role-card::before{
+    content:"";
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width:4px;
+    border-radius:12px 0 0 12px;
+    background:var(--role-color);
+    opacity:.35;
+  }
+  .role-card.selected{
+    border-color:var(--role-color);
+    background:linear-gradient(0deg, rgba(255,255,255,0.02), rgba(255,255,255,0.02)), var(--panel-2);
+  }
+  .role-card.selected::before{opacity:1;}
+  .role-card.disabled{opacity:.4; cursor:not-allowed;}
+  .role-card .rname{
+    font-weight:600;
+    font-size:13.5px;
+    margin-bottom:3px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .role-card .rcheck{
+    width:14px; height:14px;
+    border-radius:4px;
+    border:1px solid var(--text-dim);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:10px;
+    flex-shrink:0;
+  }
+  .role-card.selected .rcheck{
+    background:var(--role-color);
+    border-color:var(--role-color);
+    color:#10151F;
+  }
+  .role-card .rdesc{
+    font-size:11.5px;
+    color:var(--text-dim);
+    line-height:1.5;
+  }
+  .rounds-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:22px;
+  }
+  .rounds-row .field-label{margin-bottom:0;}
+  .round-opts{display:flex; gap:8px; flex-wrap:wrap;}
+  .round-opt{
+    padding:7px 14px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    cursor:pointer;
+    color:var(--text-dim);
+  }
+  .round-opt.active{
+    border-color:var(--brass);
+    color:var(--navy-deep);
+    background:rgba(46,111,219,0.14);
+  }
+
+  /* discussion */
+  .discuss-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:14px;
+  }
+  .discuss-head .topic-line{
+    font-size:13px;
+    color:var(--text-dim);
+    max-width:60%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .discuss-head .progress{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--brass-soft);
+  }
+  .seat-strip{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:18px;
+  }
+  .seat-chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 10px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    font-size:11.5px;
+    color:var(--text-dim);
+    background:var(--panel-2);
+  }
+  .seat-chip .dot{
+    width:8px; height:8px; border-radius:50%;
+    background:var(--role-color);
+    opacity:.4;
+  }
+  .seat-chip.speaking{
+    border-color:var(--role-color);
+    color:var(--text);
+  }
+  .seat-chip.speaking .dot{
+    opacity:1;
+    animation:pulse 1.1s infinite;
+  }
+  @media (prefers-reduced-motion:reduce){.seat-chip.speaking .dot{animation:none;}}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 var(--role-color);}
+    70%{box-shadow:0 0 0 6px transparent;}
+    100%{box-shadow:0 0 0 0 transparent;}
+  }
+  #transcript{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    max-height:520px;
+    overflow-y:auto;
+    padding-right:4px;
+  }
+  .bubble{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    background:var(--role-tint, var(--panel-2));
+    border-left:4px solid var(--role-color, var(--brass));
+    border-radius:0 10px 10px 0;
+    padding:12px 16px;
+  }
+  .bubble .avatar{
+    width:30px;
+    height:30px;
+    border-radius:50%;
+    background:var(--role-color);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:13px;
+    flex-shrink:0;
+    margin-top:1px;
+  }
+  .bubble .content{flex:1; min-width:0;}
+  .bubble .bname{
+    font-weight:600;
+    font-size:13px;
+    color:var(--role-color);
+    margin-bottom:5px;
+    display:flex;
+    justify-content:space-between;
+  }
+  .bubble .bname .turn-tag{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:var(--text-dim);
+    font-weight:400;
+  }
+  .bubble .btext{
+    font-size:14px;
+    line-height:1.65;
+    color:var(--text);
+    white-space:pre-wrap;
+  }
+  .bubble.system{
+    border-left-color:var(--brass);
+    background:rgba(46,111,219,0.08);
+  }
+  .bubble.system .bname{color:var(--navy-deep);}
+  .bubble.error{border-left-color:var(--danger); background:rgba(194,78,60,0.08);}
+  .bubble.error .bname{color:var(--danger);}
+  .typing::after{
+    content:'▍';
+    animation:blink 1s step-start infinite;
+    color:var(--brass-soft);
+  }
+  strong.emph{
+    font-weight:700;
+    color:var(--brass);
+    text-decoration:underline;
+    text-decoration-color:rgba(46,111,219,0.45);
+    text-underline-offset:2px;
+  }
+  .result-body strong.emph{
+    color:#9C4A1F;
+    text-decoration-color:rgba(156,74,31,0.45);
+  }
+  @keyframes blink{50%{opacity:0;}}
+  .discuss-actions{
+    display:flex;
+    justify-content:space-between;
+    margin-top:18px;
+  }
+
+  /* result */
+  .result-wrap{position:relative;}
+  .result-paper{
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:10px;
+    padding:32px 34px 34px;
+    position:relative;
+    overflow:hidden;
+  }
+  .result-paper h2{
+    font-family:var(--font-display);
+    font-size:18px;
+    color:var(--ink);
+    margin:0 0 4px;
+  }
+  .result-paper .rsub{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-bottom:20px;
+  }
+  .result-body{
+    font-size:14.5px;
+    line-height:1.85;
+    white-space:pre-wrap;
+    color:var(--ink);
+  }
+  .seal{
+    position:absolute;
+    top:26px; right:34px;
+    width:76px; height:76px;
+    border:3px solid #A9382F;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transform:rotate(-9deg);
+    opacity:.85;
+  }
+  .seal span{
+    color:#A9382F;
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:13px;
+    text-align:center;
+    line-height:1.3;
+  }
+  .result-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:18px;
+  }
+  .empty-note{
+    font-size:12px;
+    color:var(--text-dim);
+    margin-top:6px;
+  }
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--panel-2); border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="doc-header">
+    <div>
+      <h1>자동 토의 프로그램</h1>
+      <div class="sub">인사·재무·법무·세무 합동 토의 시뮬레이터</div>
+    </div>
+    <div class="doc-meta" id="docDate"></div>
+  </div>
+
+  <div class="steps-nav" id="stepsNav">
+    <span data-step="1">안건</span>
+    <span data-step="2">참석자</span>
+    <span data-step="3">토의</span>
+    <span data-step="4">결론</span>
+  </div>
+
+  <!-- STEP 1: TOPIC -->
+  <section class="card" id="step-topic">
+    <h2>토의 안건 입력</h2>
+    <p class="hint">텍스트로 상황을 설명하고, 필요하면 참고 이미지나 URL을 함께 첨부하세요.</p>
+
+    <div class="field-row">
+      <label class="field-label">안건 내용</label>
+      <textarea id="topicText" placeholder="예: 2027년 성과급(PS) 재원을 전년 대비 10% 축소하되, 핵심 인재 이탈은 최소화해야 하는 상황에서 지급 구조를 어떻게 설계할지 논의해주세요."></textarea>
+    </div>
+
+    <div class="field-row">
+      <label class="field-label">참고 이미지 (선택)</label>
+      <div class="file-row">
+        <label class="file-btn" id="fileLabel">
+          이미지 첨부
+          <input type="file" id="imgInput" accept="image/*" style="display:none;">
+        </label>
+        <div id="imgPreviewWrap">
+          <img id="imgPreview">
+          <button class="img-remove" id="imgRemove">제거</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <label class="field-label">참고 URL (선택)</label>
+      <input type="url" id="topicUrl" placeholder="https://...">
+      <div class="empty-note">토의 시작 전 이 URL과 관련된 내용을 웹 검색으로 한 번 조사해 회의 자료로 반영합니다. 페이지 원문을 그대로 가져오지는 않으니, 핵심 수치나 내용은 위 안건 칸에도 함께 적어주시면 더 정확해요.</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" id="toStep2">다음: 참석자 선택</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: ROLES -->
+  <section class="card" id="step-roles" style="display:none;">
+    <h2>참석자 선택</h2>
+    <p class="hint">최소 4명, 최대 9명까지 선택할 수 있습니다. 선택한 좌석이 아래 원탁에 채워집니다.</p>
+
+    <div class="table-wrap">
+      <svg id="seatSvg" viewBox="0 0 260 260"></svg>
+    </div>
+    <div class="seat-count">선택됨: <b id="countNow">0</b>명 <span style="color:var(--text-dim)">(최소 4 · 최대 9)</span></div>
+
+    <div class="roles-grid" id="rolesGrid"></div>
+
+    <div class="rounds-row">
+      <label class="field-label">토의 라운드 수</label>
+      <div class="round-opts" id="roundOpts">
+        <div class="round-opt" data-r="1">1라운드</div>
+        <div class="round-opt active" data-r="2">2라운드</div>
+        <div class="round-opt" data-r="3">3라운드</div>
+        <div class="round-opt" data-r="4">4라운드</div>
+        <div class="round-opt" data-r="5">5라운드</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="ghost" id="backToTopic">이전</button>
+      <button class="primary" id="toStep3" disabled>토의 시작</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: DISCUSSION -->
+  <section class="card" id="step-discuss" style="display:none;">
+    <div class="discuss-head">
+      <div class="topic-line" id="topicLine"></div>
+      <div class="progress" id="progressLine">준비 중...</div>
+    </div>
+    <div class="seat-strip" id="seatStrip"></div>
+    <div id="transcript"></div>
+    <div class="discuss-actions">
+      <button class="ghost" id="stopDiscuss">중단</button>
+      <button class="primary" id="toResult" style="display:none;">결론 보기</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: RESULT -->
+  <section class="card result-wrap" id="step-result" style="display:none;">
+    <div class="result-paper">
+      <div class="seal"><span>회의<br>결론</span></div>
+      <h2>합의 결론 보고서</h2>
+      <div class="rsub" id="resultMeta"></div>
+      <div class="result-body" id="resultBody">정리 중...</div>
+    </div>
+    <div class="result-actions">
+      <button class="ghost" id="backToTranscript">토의 기록 보기</button>
+      <button class="primary" id="restart">새 토의 시작</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+const ROLES = [
+  {id:'comp', name:'보상 담당자', color:'#B4553F', desc:'연봉·성과급·RSU, 보상 매트릭스, 인재 유지',
+    persona:'성과보상실 실무자로서 연봉 인상률, 성과급(PS), RSU/스톡옵션, 보상 매트릭스, 시장 벤치마크, 핵심 인재 유지 관점에서 발언한다. 데이터와 실무 기준을 근거로 한다.'},
+  {id:'payroll', name:'Payroll 담당자', color:'#3E7C74', desc:'급여 계산, 지급 일정, 원천징수 실행',
+    persona:'급여 지급 실무자로서 계산 정확성, 지급 일정, 원천징수·4대보험 공제, 급여 시스템 반영 가능 여부, 실행 리스크 관점에서 발언한다.'},
+  {id:'labor', name:'노무 담당자', color:'#445C99', desc:'근로기준법, 노사관계, 형평성 리스크',
+    persona:'노무 실무자로서 근로기준법, 취업규칙, 노동조합·근로자대표 협의, 직군 간 형평성과 차별 이슈, 노사 리스크 관점에서 발언한다.'},
+  {id:'hrlead', name:'인사 팀장', color:'#5B7A4C', desc:'조직 운영, 우선순위 조율, 실행 일정',
+    persona:'인사팀장으로서 조직 운영 전반, 여러 팀 간 우선순위 조율, 실행 일정과 내부 커뮤니케이션, 균형자 역할 관점에서 발언한다.'},
+  {id:'chro', name:'CHRO', color:'#7A4B6E', desc:'전사 전략, 경영진 설득 논리, 최종 판단',
+    persona:'최고인사책임자(CHRO)로서 전사 전략, 경영진을 설득할 논리, 장기적 조직문화 영향, 최종 의사결정 관점에서 발언한다.'},
+  {id:'tax', name:'세무 담당자', color:'#B07030', desc:'소득세, 원천징수, 국세청 리스크',
+    persona:'세무 실무자로서 소득세법, 원천징수, 비과세 한도, 법인세 손금산입 요건, 국세청 관점의 리스크를 중심으로 발언한다.'},
+  {id:'finance', name:'재무 담당자', color:'#2E5F8A', desc:'예산 총량, 손익 영향, 현금흐름',
+    persona:'재무 실무자로서 예산 총량, 손익(P&L) 영향, 현금흐름, ROI, 타 부서 예산과의 형평성 관점에서 발언한다.'},
+  {id:'legal', name:'법무 담당자', color:'#7A3B44', desc:'계약 조항, 상법·자본시장법 리스크',
+    persona:'법무 실무자로서 근로계약서 조항, 상법·자본시장법상 리스크, 소송 가능성, 문구의 법적 정합성 관점에서 발언한다.'},
+  {id:'disclosure', name:'공시 담당자', color:'#8A7B2E', desc:'공정공시, 사업보고서, 금감원 규정',
+    persona:'공시 담당자로서 공정공시 의무, 사업보고서·반기보고서 기재사항, 상위 5인 보수공시, 금융감독원 규정, IR 영향 관점에서 발언한다.'}
+];
+
+const state = {
+  step:1,
+  topicText:'',
+  topicUrl:'',
+  image:null,
+  selected:new Set(),
+  rounds:2,
+  transcript:[],
+  running:false,
+  researchSummary:null,
+  turnCount:0,
+  totalTurns:0
+};
+
+document.getElementById('docDate').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'});
+
+function byId(id){return document.getElementById(id);}
+
+/* ---------- SEAT SVG ---------- */
+function buildSeatSvg(){
+  const svg = byId('seatSvg');
+  const cx=130, cy=130, rTable=62, rSeat=100;
+  let html = `<circle cx="${cx}" cy="${cy}" r="${rTable}" fill="none" stroke="rgba(21,58,99,0.22)" stroke-width="1.5"/>`;
+  ROLES.forEach((r,i)=>{
+    const angle = (i*(360/ROLES.length) - 90) * Math.PI/180;
+    const x = cx + rSeat*Math.cos(angle);
+    const y = cy + rSeat*Math.sin(angle);
+    html += `<circle id="seat-${r.id}" data-id="${r.id}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="var(--panel-2)" stroke="rgba(21,58,99,0.35)" stroke-width="1.5" style="cursor:pointer; transition:fill .15s, stroke .15s;"/>`;
+  });
+  svg.innerHTML = html;
+  svg.querySelectorAll('circle[data-id]').forEach(c=>{
+    c.addEventListener('click', ()=>toggleRole(c.dataset.id));
+  });
+}
+
+function updateSeatSvg(){
+  ROLES.forEach(r=>{
+    const c = byId('seat-'+r.id);
+    if(!c) return;
+    if(state.selected.has(r.id)){
+      c.setAttribute('fill', r.color);
+      c.setAttribute('stroke', r.color);
+    } else {
+      c.setAttribute('fill', 'var(--panel-2)');
+      c.setAttribute('stroke', 'rgba(21,58,99,0.35)');
+    }
+  });
+}
+
+/* ---------- ROLE CARDS ---------- */
+function buildRoleCards(){
+  const grid = byId('rolesGrid');
+  grid.innerHTML = ROLES.map(r=>`
+    <div class="role-card" data-id="${r.id}" style="--role-color:${r.color}">
+      <div class="rname"><span class="rcheck">✓</span>${r.name}</div>
+      <div class="rdesc">${r.desc}</div>
+    </div>
+  `).join('');
+  grid.querySelectorAll('.role-card').forEach(el=>{
+    el.addEventListener('click', ()=>toggleRole(el.dataset.id));
+  });
+}
+
+function toggleRole(id){
+  if(state.selected.has(id)){
+    state.selected.delete(id);
+  } else {
+    if(state.selected.size >= 9) return;
+    state.selected.add(id);
+  }
+  renderRoleSelection();
+}
+
+function renderRoleSelection(){
+  const n = state.selected.size;
+  byId('countNow').textContent = n;
+  document.querySelectorAll('.role-card').forEach(el=>{
+    const id = el.dataset.id;
+    const sel = state.selected.has(id);
+    el.classList.toggle('selected', sel);
+    el.classList.toggle('disabled', !sel && n>=9);
+  });
+  updateSeatSvg();
+  byId('toStep3').disabled = !(n>=4 && n<=9);
+}
+
+byId('roundOpts').addEventListener('click', (e)=>{
+  const opt = e.target.closest('.round-opt');
+  if(!opt) return;
+  state.rounds = parseInt(opt.dataset.r,10);
+  document.querySelectorAll('.round-opt').forEach(o=>o.classList.toggle('active', o===opt));
+});
+
+/* ---------- STEP NAV ---------- */
+function goStep(n){
+  state.step = n;
+  ['topic','roles','discuss','result'].forEach((name,i)=>{
+    byId('step-'+name).style.display = (i+1===n) ? 'block' : 'none';
+  });
+  document.querySelectorAll('#stepsNav span').forEach(s=>{
+    const sn = parseInt(s.dataset.step,10);
+    s.classList.toggle('active', sn===n);
+    s.classList.toggle('done', sn<n);
+  });
+}
+
+byId('toStep2').addEventListener('click', ()=>{
+  state.topicText = byId('topicText').value.trim();
+  state.topicUrl = byId('topicUrl').value.trim();
+  if(!state.topicText){
+    byId('topicText').style.borderColor = 'var(--danger)';
+    byId('topicText').placeholder = '안건 내용을 입력해주세요.';
+    return;
+  }
+  goStep(2);
+});
+byId('backToTopic').addEventListener('click', ()=>goStep(1));
+byId('backToTranscript').addEventListener('click', ()=>goStep(3));
+
+/* image upload */
+byId('imgInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const dataUrl = reader.result;
+    const match = dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.*)$/);
+    if(match){
+      state.image = {mediaType:match[1], data:match[2]};
+      byId('imgPreview').src = dataUrl;
+      byId('imgPreviewWrap').style.display='flex';
+    }
+  };
+  reader.readAsDataURL(file);
+});
+byId('imgRemove').addEventListener('click', ()=>{
+  state.image = null;
+  byId('imgInput').value = '';
+  byId('imgPreviewWrap').style.display='none';
+});
+
+/* ---------- DISCUSSION ---------- */
+byId('toStep3').addEventListener('click', ()=>{
+  goStep(3);
+  startDiscussion();
+});
+
+function roleById(id){ return ROLES.find(r=>r.id===id); }
+
+function buildSeatStrip(){
+  const strip = byId('seatStrip');
+  strip.innerHTML = [...state.selected].map(id=>{
+    const r = roleById(id);
+    return `<div class="seat-chip" id="chip-${id}" style="--role-color:${r.color}"><span class="dot"></span>${r.name}</div>`;
+  }).join('');
+}
+
+function setSpeaking(id){
+  document.querySelectorAll('.seat-chip').forEach(c=>c.classList.remove('speaking'));
+  if(id){
+    const chip = byId('chip-'+id);
+    if(chip) chip.classList.add('speaking');
+  }
+}
+
+function hexToRgba(hex, a){
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16);
+  const g = parseInt(h.substring(2,4),16);
+  const b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function escapeHtml(str){
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+function renderEmphasis(text){
+  const esc = escapeHtml(text);
+  return esc.replace(/\*\*(.+?)\*\*/g, '<strong class="emph">$1</strong>');
+}
+
+function addBubble(roleObj, kind){
+  const wrap = byId('transcript');
+  const div = document.createElement('div');
+  div.className = 'bubble' + (kind ? ' '+kind : '');
+  let avatarHtml = '';
+  if(roleObj){
+    div.style.setProperty('--role-color', roleObj.color);
+    div.style.setProperty('--role-tint', hexToRgba(roleObj.color, 0.12));
+    avatarHtml = `<div class="avatar">${roleObj.name.charAt(0)}</div>`;
+  }
+  const nameTxt = roleObj ? roleObj.name : (kind==='system' ? '진행' : '오류');
+  div.innerHTML = `${avatarHtml}<div class="content"><div class="bname"><span>${nameTxt}</span><span class="turn-tag" data-tag></span></div><div class="btext" data-text></div></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return {
+    setTag:(t)=>{ div.querySelector('[data-tag]').textContent = t; },
+    setText:(t, streaming)=>{
+      const el = div.querySelector('[data-text]');
+      el.innerHTML = renderEmphasis(t);
+      el.classList.toggle('typing', !!streaming);
+      wrap.scrollTop = wrap.scrollHeight;
+    }
+  };
+}
+
+function buildContext(){
+  let ctx = `[회의 안건]\n${state.topicText}\n`;
+  if(state.topicUrl){
+    ctx += `\n[참고 자료 요약]\n${state.researchSummary || '(관련 자료를 찾지 못했습니다. 안건 설명만 참고하세요.)'}\n`;
+  }
+  ctx += `\n[지금까지의 발언 기록]\n`;
+  if(state.transcript.length===0){
+    ctx += '(아직 발언 없음 - 첫 발언자입니다)\n';
+  } else {
+    state.transcript.forEach(t=>{ ctx += `${t.roleName}: ${t.text}\n`; });
+  }
+  return ctx;
+}
+
+function makeStoppedError(){
+  const err = new Error('중단됨');
+  err.name = 'StoppedError';
+  return err;
+}
+
+async function streamCompletion(system, contextText, onDelta, shouldStop, tools){
+  const contentBlocks = [];
+  if(state.image){
+    contentBlocks.push({type:'image', source:{type:'base64', media_type:state.image.mediaType, data:state.image.data}});
+  }
+  contentBlocks.push({type:'text', text:contextText});
+
+  const body = {
+    model:'claude-sonnet-4-6',
+    max_tokens:1000,
+    system,
+    stream:true,
+    messages:[{role:'user', content:contentBlocks}]
+  };
+  if(tools && tools.length){
+    body.tools = tools;
+  }
+
+  // 주의: fetch에 AbortSignal을 넘기면, 이 화면을 감싸는 미리보기 프레임이
+  // postMessage로 요청을 중계하는 과정에서 AbortSignal을 복제하지 못해 실패한다.
+  // 그래서 signal은 쓰지 않고, 아래 읽기 루프에서 shouldStop()을 직접 검사해 중단한다.
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+
+  if(!resp.ok || !resp.body){
+    throw new Error('API 요청 실패 ('+resp.status+')');
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+
+  while(true){
+    if(shouldStop && shouldStop()){
+      try{ reader.cancel(); }catch(e){}
+      throw makeStoppedError();
+    }
+    const {done, value} = await reader.read();
+    if(done) break;
+    buffer += decoder.decode(value, {stream:true});
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for(const line of lines){
+      if(!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if(data === '[DONE]') continue;
+      try{
+        const json = JSON.parse(data);
+        if(json.type === 'content_block_delta' && json.delta && json.delta.type === 'text_delta'){
+          fullText += json.delta.text;
+          onDelta(fullText);
+        }
+      }catch(e){}
+    }
+  }
+  return fullText.trim();
+}
+
+function roleSystemPrompt(role){
+  return `당신은 게임회사 인사(HR) 부서 내부 회의에 참석한 '${role.name}'입니다.
+역할 관점: ${role.persona}
+반드시 지켜야 할 규칙:
+- 존댓말을 사용하고 실제 사내 회의 발언처럼 자연스럽게 말한다.
+- 이전 발언자의 의견에 필요하면 이름을 직접 언급하며 동의·반박·보완한다.
+- 본인 역할 관점에서만 이야기하고 다른 역할의 결론을 대신 내리지 않는다.
+- 3~6문장 내외로 간결하게 발언하며 "안녕하세요" 같은 인사말 없이 바로 본론으로 들어간다.
+- 특히 주의 깊게 봐야 할 숫자, 리스크, 결론에 해당하는 핵심 문구는 **이렇게** 별표 두 개로 감싸서 강조한다. 문장 하나에 1~2곳 정도만 강조하고 남용하지 않는다.
+- 별표 강조 외의 다른 마크다운 기호(#, -, \`, > 등)는 쓰지 않고 순수한 구어체 문장으로만 답한다.
+- URL 접근 가능 여부나 자신이 인터넷에 접속할 수 있는지 여부는 언급하지 않는다. 주어진 안건과 참고 자료 요약만을 사실로 받아들이고 그 안에서 발언한다.`;
+}
+
+function shuffled(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+async function startDiscussion(){
+  state.transcript = [];
+  state.running = true;
+  byId('transcript').innerHTML = '';
+  byId('toResult').style.display = 'none';
+  byId('stopDiscuss').textContent = '중단';
+  buildSeatStrip();
+  byId('topicLine').textContent = '안건 · ' + state.topicText;
+
+  const roleOrder = [...state.selected];
+  const totalTurns = roleOrder.length * state.rounds;
+  state.totalTurns = totalTurns;
+  state.turnCount = 0;
+  byId('progressLine').textContent = `0 / ${totalTurns} 발언`;
+
+  const shouldStop = () => !state.running;
+
+  if(state.topicUrl){
+    const researchBubble = addBubble(null,'system');
+    researchBubble.setText('참고 URL과 관련된 자료를 검색하고 있습니다...', true);
+    const researchSystem = `당신은 회의 준비를 돕는 리서치 담당자입니다. 웹 검색 도구를 사용해 주어진 URL 및 안건과 관련된 사실 정보를 찾아 3~5문장으로 간결하게 요약하세요.
+관련 정보를 찾지 못한 경우에만 그 사실을 있는 그대로 말하고, 안건 설명만으로 논의를 진행해도 된다고 안내하세요.
+마크다운 서식을 쓰지 말고 순수한 문장으로만 답하세요.`;
+    const researchCtx = `[안건 설명]\n${state.topicText}\n\n[참고 URL]\n${state.topicUrl}\n\n이 URL 및 안건과 관련된 핵심 정보를 웹 검색으로 확인해 요약하세요.`;
+    try{
+      const summary = await streamCompletion(researchSystem, researchCtx, (partial)=>{
+        researchBubble.setText(partial, true);
+      }, shouldStop, [{type:'web_search_20250305', name:'web_search'}]);
+      state.researchSummary = summary || null;
+      researchBubble.setText(summary || '관련 자료를 찾지 못했습니다. 안건 설명만으로 토의를 진행합니다.', false);
+    }catch(err){
+      state.researchSummary = null;
+      researchBubble.setText('자료 검색에 실패했습니다. 안건 설명만으로 토의를 진행합니다.', false);
+    }
+    if(!state.running) return;
+  }
+
+  addBubble(null,'system').setText(`총 ${roleOrder.length}명, ${state.rounds}라운드로 토의를 시작합니다.`);
+
+  outer:
+  for(let round=1; round<=state.rounds; round++){
+    const order = shuffled(roleOrder);
+    for(const roleId of order){
+      if(!state.running) break outer;
+      const role = roleById(roleId);
+      setSpeaking(roleId);
+      const bubble = addBubble(role);
+      bubble.setTag(`라운드 ${round}`);
+      bubble.setText('', true);
+      try{
+        const ctx = buildContext() + `\n이제 ${role.name}(으)로서 발언하세요.`;
+        const text = await streamCompletion(roleSystemPrompt(role), ctx, (partial)=>{
+          bubble.setText(partial, true);
+        }, shouldStop);
+        bubble.setText(text || '(발언 없음)', false);
+        state.transcript.push({roleId, roleName:role.name, text: text || '(발언 없음)', round});
+      }catch(err){
+        if(err.name === 'StoppedError'){
+          bubble.setText('(중단됨)', false);
+          break outer;
+        }
+        bubble.setText('오류가 발생했습니다: ' + err.message, false);
+        state.transcript.push({roleId, roleName:role.name, text:'(오류로 발언 생략)', round});
+      }
+      state.turnCount++;
+      byId('progressLine').textContent = `${state.turnCount} / ${totalTurns} 발언`;
+    }
+  }
+  setSpeaking(null);
+
+  if(state.running){
+    addBubble(null,'system').setText('모든 라운드가 끝났습니다. 결론을 정리하고 있습니다...');
+    await runSynthesis(shouldStop);
+    byId('toResult').style.display = 'inline-block';
+    byId('stopDiscuss').textContent = '토의 기록 유지';
+  }
+  state.running = false;
+}
+
+byId('stopDiscuss').addEventListener('click', ()=>{
+  if(state.running){
+    state.running = false;
+  } else {
+    goStep(3);
+  }
+});
+
+async function runSynthesis(shouldStop){
+  const system = `당신은 이 사내 HR 회의의 서기 겸 진행자입니다. 여러 담당자의 발언을 종합해 최종 결론을 작성합니다.
+아래 4개 항목을 번호와 줄바꿈만으로 간결하게 정리하세요:
+1. 논의 요약
+2. 합의된 사항
+3. 이견이 남은 부분 및 리스크
+4. 권고 후속 조치
+특히 주의 깊게 봐야 할 숫자, 리스크, 결정사항은 **이렇게** 별표 두 개로 감싸서 강조하세요. 그 외 다른 마크다운 기호(#, -, \` 등)는 쓰지 마세요.`;
+  const ctx = buildContext() + '\n위 회의 내용을 바탕으로 최종 결론을 작성하세요.';
+  const resultBody = byId('resultBody');
+  resultBody.innerHTML = '';
+  try{
+    const text = await streamCompletion(system, ctx, (partial)=>{ resultBody.innerHTML = renderEmphasis(partial); }, shouldStop);
+    resultBody.innerHTML = renderEmphasis(text || '결론을 생성하지 못했습니다.');
+  }catch(err){
+    resultBody.textContent = '결론 생성 중 오류가 발생했습니다: ' + err.message;
+  }
+  byId('resultMeta').textContent = `참석 ${state.selected.size}명 · ${state.rounds}라운드 · ${new Date().toLocaleString('ko-KR')}`;
+}
+
+byId('toResult').addEventListener('click', ()=>goStep(4));
+
+byId('restart').addEventListener('click', ()=>{
+  state.transcript = [];
+  state.selected = new Set();
+  state.image = null;
+  state.researchSummary = null;
+  byId('topicText').value='';
+  byId('topicUrl').value='';
+  byId('imgInput').value='';
+  byId('imgPreviewWrap').style.display='none';
+  buildRoleCards();
+  renderRoleSelection();
+  goStep(1);
+});
+
+/* init */
+buildSeatSvg();
+buildRoleCards();
+renderRoleSelection();
+goStep(1);
+</script>
+</body>
+</html>
