@@ -81,6 +81,12 @@
     border-radius:8px;
     color:var(--text-dim);
     background:var(--panel);
+    cursor:pointer;
+    transition:opacity .15s;
+  }
+  .steps-nav span.locked{
+    cursor:not-allowed;
+    opacity:.5;
   }
   .steps-nav span.active{
     color:#FFFFFF;
@@ -485,6 +491,36 @@
     color:var(--text-dim);
     margin-top:6px;
   }
+  #historyList{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-top:10px;
+  }
+  .history-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--panel-2);
+    cursor:pointer;
+  }
+  .history-item:hover{border-color:var(--brass-soft);}
+  .hi-topic{font-size:13px; color:var(--text); margin-bottom:3px;}
+  .hi-meta{font-size:11px; color:var(--text-dim); font-family:var(--font-mono);}
+  .hi-delete{
+    background:none;
+    border:none;
+    color:var(--text-dim);
+    cursor:pointer;
+    font-size:13px;
+    padding:4px 6px;
+    flex-shrink:0;
+  }
+  .hi-delete:hover{color:var(--danger);}
   ::-webkit-scrollbar{width:8px;}
   ::-webkit-scrollbar-thumb{background:var(--panel-2); border-radius:4px;}
 </style>
@@ -539,6 +575,11 @@
 
     <div class="btn-row">
       <button class="primary" id="toStep2">다음: 참석자 선택</button>
+    </div>
+
+    <div id="historyPanel" style="display:none;">
+      <label class="field-label" style="margin-top:22px; padding-top:18px; border-top:1px solid var(--line); display:block;">저장된 토의 기록</label>
+      <div id="historyList"></div>
     </div>
   </section>
 
@@ -633,6 +674,9 @@ const state = {
   transcript:[],
   running:false,
   researchSummary:null,
+  imageDescription:null,
+  maxStep:1,
+  playbackMode:false,
   turnCount:0,
   totalTurns:0
 };
@@ -725,9 +769,116 @@ function goStep(n){
   document.querySelectorAll('#stepsNav span').forEach(s=>{
     const sn = parseInt(s.dataset.step,10);
     s.classList.toggle('active', sn===n);
-    s.classList.toggle('done', sn<n);
+    s.classList.toggle('done', sn<n && sn<=state.maxStep);
+    s.classList.toggle('locked', sn>state.maxStep);
   });
 }
+
+const HISTORY_KEY = 'autoDiscussionHistory';
+
+function loadHistory(){
+  try{
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){
+    return [];
+  }
+}
+
+function saveHistoryEntry(entry){
+  try{
+    const list = loadHistory();
+    list.unshift(entry);
+    while(list.length > 20) list.pop();
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+function deleteHistoryEntry(id){
+  try{
+    const list = loadHistory().filter(h=>h.id!==id);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+  }catch(e){}
+}
+
+function renderHistoryPanel(){
+  const list = loadHistory();
+  const panel = byId('historyPanel');
+  const listEl = byId('historyList');
+  if(!list.length){
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+  listEl.innerHTML = list.map(h=>`
+    <div class="history-item" data-id="${h.id}">
+      <div class="hi-main">
+        <div class="hi-topic">${escapeHtml((h.topic||'').slice(0,60))}${(h.topic||'').length>60?'…':''}</div>
+        <div class="hi-meta">${new Date(h.date).toLocaleString('ko-KR')} · 참석 ${h.roles.length}명 · ${h.rounds}라운드</div>
+      </div>
+      <button type="button" class="hi-delete" data-id="${h.id}" title="삭제">✕</button>
+    </div>
+  `).join('');
+  listEl.querySelectorAll('.history-item').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      if(e.target.closest('.hi-delete')) return;
+      openHistoryEntry(parseInt(el.dataset.id,10));
+    });
+  });
+  listEl.querySelectorAll('.hi-delete').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      deleteHistoryEntry(parseInt(btn.dataset.id,10));
+      renderHistoryPanel();
+    });
+  });
+}
+
+function openHistoryEntry(id){
+  const entry = loadHistory().find(h=>h.id===id);
+  if(!entry) return;
+  state.playbackMode = true;
+  state.transcript = entry.transcript;
+  state.selected = new Set(entry.roles);
+  state.rounds = entry.rounds;
+  state.topicText = entry.topic;
+  state.maxStep = 4;
+
+  byId('transcript').innerHTML = '';
+  buildSeatStrip();
+  byId('topicLine').textContent = '안건 · ' + entry.topic;
+  byId('progressLine').textContent = `${entry.transcript.length} / ${entry.transcript.length} 발언 · 저장된 기록`;
+  entry.transcript.forEach(t=>{
+    const role = roleById(t.roleId);
+    const b = addBubble(role);
+    b.setTag(`라운드 ${t.round}`);
+    b.setText(t.text, false);
+  });
+  byId('stopDiscuss').style.display = 'none';
+  byId('toResult').style.display = 'inline-block';
+
+  byId('resultBody').innerHTML = renderEmphasis(entry.conclusion || '결론 내용이 저장되어 있지 않습니다.');
+  byId('resultMeta').textContent = `참석 ${entry.roles.length}명 · ${entry.rounds}라운드 · ${new Date(entry.date).toLocaleString('ko-KR')} · 저장된 기록`;
+  goStep(4);
+}
+
+function updateStepsNavLocks(){
+  document.querySelectorAll('#stepsNav span').forEach(s=>{
+    const sn = parseInt(s.dataset.step,10);
+    s.classList.toggle('locked', sn>state.maxStep);
+    s.classList.toggle('done', sn<state.step && sn<=state.maxStep);
+  });
+}
+
+byId('stepsNav').addEventListener('click', (e)=>{
+  const span = e.target.closest('span[data-step]');
+  if(!span) return;
+  const n = parseInt(span.dataset.step,10);
+  if(n <= state.maxStep) goStep(n);
+});
 
 byId('toStep2').addEventListener('click', ()=>{
   state.topicText = byId('topicText').value.trim();
@@ -738,6 +889,7 @@ byId('toStep2').addEventListener('click', ()=>{
     return;
   }
   goStep(2);
+  state.maxStep = Math.max(state.maxStep, 2);
 });
 byId('backToTopic').addEventListener('click', ()=>goStep(1));
 byId('backToTranscript').addEventListener('click', ()=>goStep(3));
@@ -752,6 +904,7 @@ byId('imgInput').addEventListener('change', (e)=>{
     const match = dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.*)$/);
     if(match){
       state.image = {mediaType:match[1], data:match[2]};
+      state.imageDescription = null;
       byId('imgPreview').src = dataUrl;
       byId('imgPreviewWrap').style.display='flex';
     }
@@ -760,12 +913,14 @@ byId('imgInput').addEventListener('change', (e)=>{
 });
 byId('imgRemove').addEventListener('click', ()=>{
   state.image = null;
+  state.imageDescription = null;
   byId('imgInput').value = '';
   byId('imgPreviewWrap').style.display='none';
 });
 
 /* ---------- DISCUSSION ---------- */
 byId('toStep3').addEventListener('click', ()=>{
+  state.maxStep = Math.max(state.maxStep, 3);
   goStep(3);
   startDiscussion();
 });
@@ -839,6 +994,9 @@ function addBubble(roleObj, kind){
 
 function buildContext(){
   let ctx = `[회의 안건]\n${state.topicText}\n`;
+  if(state.image){
+    ctx += `\n[첨부 이미지 요약]\n${state.imageDescription || '(이미지 내용을 확인하지 못했습니다. 안건 설명만 참고하세요.)'}\n`;
+  }
   if(state.topicUrl){
     ctx += `\n[참고 자료 요약]\n${state.researchSummary || '(관련 자료를 찾지 못했습니다. 안건 설명만 참고하세요.)'}\n`;
   }
@@ -857,9 +1015,9 @@ function makeStoppedError(){
   return err;
 }
 
-async function streamCompletion(system, contextText, onDelta, shouldStop, tools){
+async function streamCompletion(system, contextText, onDelta, shouldStop, tools, includeImage){
   const contentBlocks = [];
-  if(state.image){
+  if(includeImage && state.image){
     contentBlocks.push({type:'image', source:{type:'base64', media_type:state.image.mediaType, data:state.image.data}});
   }
   contentBlocks.push({type:'text', text:contextText});
@@ -958,6 +1116,38 @@ async function startDiscussion(){
 
   const shouldStop = () => !state.running;
 
+  if(state.image){
+    const imgBubble = addBubble(null,'system');
+    imgBubble.setText('첨부한 이미지 내용을 확인하고 있습니다...', true);
+    const imgSystem = `당신은 회의 준비를 돕는 보조입니다. 첨부된 이미지에 담긴 내용을 회의 참고 자료로 쓸 수 있도록 핵심 정보를 최대한 구체적으로 정리하세요.
+표나 숫자가 있다면 값을 그대로 포함해서 설명하세요. 마크다운 서식 없이 5~8문장으로 작성하세요.`;
+    const imgCtx = `[안건 설명]\n${state.topicText}\n\n첨부된 이미지의 내용을 위 안건과 관련지어 설명하세요.`;
+    let desc = null, imgErr = null;
+    for(let attempt=0; attempt<3; attempt++){
+      if(!state.running){ imgErr = makeStoppedError(); break; }
+      try{
+        desc = await streamCompletion(imgSystem, imgCtx, (partial)=>{
+          imgBubble.setText(partial, true);
+        }, shouldStop, null, true);
+        imgErr = null;
+        break;
+      }catch(err){
+        imgErr = err;
+        if(err.name === 'StoppedError') break;
+        if(attempt < 2) await sleep(1200 * (attempt+1));
+      }
+    }
+    if(imgErr && imgErr.name === 'StoppedError') return;
+    if(imgErr){
+      state.imageDescription = null;
+      imgBubble.setText('이미지 내용을 확인하지 못했습니다. 안건 설명만으로 토의를 진행합니다.', false);
+    } else {
+      state.imageDescription = desc || null;
+      imgBubble.setText(desc || '이미지에서 특별한 내용을 찾지 못했습니다.', false);
+    }
+    if(!state.running) return;
+  }
+
   if(state.topicUrl){
     const researchBubble = addBubble(null,'system');
     researchBubble.setText('참고 URL과 관련된 자료를 검색하고 있습니다...', true);
@@ -1046,6 +1236,8 @@ async function startDiscussion(){
   if(state.running){
     addBubble(null,'system').setText('모든 라운드가 끝났습니다. 결론을 정리하고 있습니다...');
     await runSynthesis(shouldStop);
+    state.maxStep = Math.max(state.maxStep, 4);
+    updateStepsNavLocks();
     byId('toResult').style.display = 'inline-block';
     byId('stopDiscuss').textContent = '토의 기록 유지';
   }
@@ -1088,23 +1280,43 @@ async function runSynthesis(shouldStop){
     resultBody.textContent = '결론 생성 중 오류가 발생했습니다: ' + lastErr.message;
   } else {
     resultBody.innerHTML = renderEmphasis(text || '결론을 생성하지 못했습니다.');
+    const saved = saveHistoryEntry({
+      id: Date.now(),
+      date: new Date().toISOString(),
+      topic: state.topicText,
+      roles: [...state.selected],
+      rounds: state.rounds,
+      transcript: state.transcript,
+      conclusion: text || ''
+    });
+    renderHistoryPanel();
+    if(!saved){
+      addBubble(null,'system').setText('참고: 이 미리보기 화면에서는 브라우저 저장이 지원되지 않아 이번 토의 기록은 저장되지 않았습니다. GitHub Pages 등 실제 주소에서 열면 정상적으로 저장됩니다.', false);
+    }
   }
   byId('resultMeta').textContent = `참석 ${state.selected.size}명 · ${state.rounds}라운드 · ${new Date().toLocaleString('ko-KR')}`;
 }
 
-byId('toResult').addEventListener('click', ()=>goStep(4));
+byId('toResult').addEventListener('click', ()=>{
+  state.maxStep = Math.max(state.maxStep, 4);
+  goStep(4);
+});
 
 byId('restart').addEventListener('click', ()=>{
   state.transcript = [];
   state.selected = new Set();
   state.image = null;
   state.researchSummary = null;
+  state.imageDescription = null;
+  state.playbackMode = false;
+  state.maxStep = 1;
   byId('topicText').value='';
   byId('topicUrl').value='';
   byId('imgInput').value='';
   byId('imgPreviewWrap').style.display='none';
   buildRoleCards();
   renderRoleSelection();
+  renderHistoryPanel();
   goStep(1);
 });
 
@@ -1112,6 +1324,7 @@ byId('restart').addEventListener('click', ()=>{
 buildSeatSvg();
 buildRoleCards();
 renderRoleSelection();
+renderHistoryPanel();
 goStep(1);
 </script>
 </body>
