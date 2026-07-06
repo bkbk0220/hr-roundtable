@@ -788,6 +788,10 @@ function setSpeaking(id){
   }
 }
 
+function sleep(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function hexToRgba(hex, a){
   const h = hex.replace('#','');
   const r = parseInt(h.substring(0,2),16);
@@ -962,9 +966,25 @@ async function startDiscussion(){
 마크다운 서식을 쓰지 말고 순수한 문장으로만 답하세요.`;
     const researchCtx = `[안건 설명]\n${state.topicText}\n\n[참고 URL]\n${state.topicUrl}\n\n이 URL 및 안건과 관련된 핵심 정보를 웹 검색으로 확인해 요약하세요.`;
     try{
-      const summary = await streamCompletion(researchSystem, researchCtx, (partial)=>{
-        researchBubble.setText(partial, true);
-      }, shouldStop, [{type:'web_search_20250305', name:'web_search'}]);
+      let summary = null, lastErr = null;
+      for(let attempt=0; attempt<3; attempt++){
+        if(!state.running){ lastErr = makeStoppedError(); break; }
+        researchBubble.setText(attempt===0 ? '참고 URL과 관련된 자료를 검색하고 있습니다...' : `참고 URL과 관련된 자료를 검색하고 있습니다... (재시도 ${attempt})`, true);
+        try{
+          summary = await streamCompletion(researchSystem, researchCtx, (partial)=>{
+            researchBubble.setText(partial, true);
+          }, shouldStop, [{type:'web_search_20250305', name:'web_search'}]);
+          lastErr = null;
+          break;
+        }catch(err){
+          lastErr = err;
+          if(err.name === 'StoppedError') break;
+          if(attempt < 2) await sleep(1200 * (attempt+1));
+        }
+      }
+      if(lastErr && lastErr.name !== 'StoppedError'){
+        throw lastErr;
+      }
       state.researchSummary = summary || null;
       researchBubble.setText(summary || '관련 자료를 찾지 못했습니다. 안건 설명만으로 토의를 진행합니다.', false);
     }catch(err){
@@ -984,22 +1004,38 @@ async function startDiscussion(){
       const role = roleById(roleId);
       setSpeaking(roleId);
       const bubble = addBubble(role);
-      bubble.setTag(`라운드 ${round}`);
-      bubble.setText('', true);
-      try{
-        const ctx = buildContext() + `\n이제 ${role.name}(으)로서 발언하세요.`;
-        const text = await streamCompletion(roleSystemPrompt(role), ctx, (partial)=>{
-          bubble.setText(partial, true);
-        }, shouldStop);
+      await sleep(700); // 연속 요청 사이에 짧은 텀을 둬서 순간적인 과다 요청으로 끊기는 것을 방지
+
+      let text = null;
+      let lastErr = null;
+      const maxAttempts = 3;
+      for(let attempt=0; attempt<maxAttempts; attempt++){
+        if(!state.running){ lastErr = makeStoppedError(); break; }
+        bubble.setTag(`라운드 ${round}` + (attempt>0 ? ` · 재시도 ${attempt}` : ''));
+        bubble.setText('', true);
+        try{
+          const ctx = buildContext() + `\n이제 ${role.name}(으)로서 발언하세요.`;
+          text = await streamCompletion(roleSystemPrompt(role), ctx, (partial)=>{
+            bubble.setText(partial, true);
+          }, shouldStop);
+          lastErr = null;
+          break;
+        }catch(err){
+          lastErr = err;
+          if(err.name === 'StoppedError') break;
+          if(attempt < maxAttempts-1) await sleep(1200 * (attempt+1));
+        }
+      }
+
+      if(lastErr && lastErr.name === 'StoppedError'){
+        bubble.setText('(중단됨)', false);
+        break outer;
+      } else if(lastErr){
+        bubble.setText('연결이 불안정해 발언을 받아오지 못했습니다 (' + lastErr.message + '). 자동 재시도에도 실패했습니다.', false);
+        state.transcript.push({roleId, roleName:role.name, text:'(오류로 발언 생략)', round});
+      } else {
         bubble.setText(text || '(발언 없음)', false);
         state.transcript.push({roleId, roleName:role.name, text: text || '(발언 없음)', round});
-      }catch(err){
-        if(err.name === 'StoppedError'){
-          bubble.setText('(중단됨)', false);
-          break outer;
-        }
-        bubble.setText('오류가 발생했습니다: ' + err.message, false);
-        state.transcript.push({roleId, roleName:role.name, text:'(오류로 발언 생략)', round});
       }
       state.turnCount++;
       byId('progressLine').textContent = `${state.turnCount} / ${totalTurns} 발언`;
@@ -1035,11 +1071,23 @@ async function runSynthesis(shouldStop){
   const ctx = buildContext() + '\n위 회의 내용을 바탕으로 최종 결론을 작성하세요.';
   const resultBody = byId('resultBody');
   resultBody.innerHTML = '';
-  try{
-    const text = await streamCompletion(system, ctx, (partial)=>{ resultBody.innerHTML = renderEmphasis(partial); }, shouldStop);
+  let text = null, lastErr = null;
+  for(let attempt=0; attempt<3; attempt++){
+    if(!state.running){ lastErr = makeStoppedError(); break; }
+    try{
+      text = await streamCompletion(system, ctx, (partial)=>{ resultBody.innerHTML = renderEmphasis(partial); }, shouldStop);
+      lastErr = null;
+      break;
+    }catch(err){
+      lastErr = err;
+      if(err.name === 'StoppedError') break;
+      if(attempt < 2) await sleep(1200 * (attempt+1));
+    }
+  }
+  if(lastErr){
+    resultBody.textContent = '결론 생성 중 오류가 발생했습니다: ' + lastErr.message;
+  } else {
     resultBody.innerHTML = renderEmphasis(text || '결론을 생성하지 못했습니다.');
-  }catch(err){
-    resultBody.textContent = '결론 생성 중 오류가 발생했습니다: ' + err.message;
   }
   byId('resultMeta').textContent = `참석 ${state.selected.size}명 · ${state.rounds}라운드 · ${new Date().toLocaleString('ko-KR')}`;
 }
